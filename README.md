@@ -9,7 +9,7 @@ Script qui lit des fichiers de données en entrée (CSV / Excel), applique des r
 
 ## Structure du projet
 ```text
-mon-projet-calculs/
+RBM_TOOL/
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
