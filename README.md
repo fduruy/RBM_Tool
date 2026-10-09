@@ -3,9 +3,9 @@ Projet OFFSETTING
 ## Objectif
 Script qui lit des fichiers de données en entrée (CSV / Excel), applique des règles de calcul, et écrit les résultats dans des fichiers de sortie.
 
-- **Entrées** : [chemin/nom des fichiers, colonnes attendues, format des dates]
-- **Calculs** : [décrire brièvement les règles de calcul]
-- **Sorties** : [nom des fichiers produits, colonnes/métriques attendues]
+- **INPUTS** : [data/input/.txt, colonnes attendues, format des dates]
+- **CALCULATIONS** : [décrire brièvement les règles de calcul]
+- **OUTPUTS** : [data/output/resultatsYYYYMMDD.csv, nom des fichiers produits, colonnes/métriques attendues]
 
 ## Structure du projet
 ```text
