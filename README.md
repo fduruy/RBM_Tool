@@ -3,9 +3,9 @@ Projet OFFSETTING
 ## Objectif
 Script qui lit des fichiers de données en entrée (CSV / Excel), applique des règles de calcul, et écrit les résultats dans des fichiers de sortie.
 
-- **INPUTS** : [data/input/.txt, colonnes attendues, format des dates]
-- **CALCULATIONS** : [décrire brièvement les règles de calcul]
-- **OUTPUTS** : [data/output/resultatsYYYYMMDD.csv, nom des fichiers produits, colonnes/métriques attendues]
+- **INPUTS** : [#1 read input file(s) : data/input/GT_Valo.csv, toutes les colonnes]
+- **CALCULATIONS** : [#2 Identify Internal trades, #3 Identify External trades, #compute a summary of internal trades and external trades]
+- **OUTPUTS** : [data/output/resultats[YYYYMMDD].csv, summarize the resultas from Calculations in CSV, format attendu :Internal trades et MTM, External trades et MTM]
 
 ## Structure du projet
 ```text
