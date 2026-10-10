@@ -2,9 +2,9 @@
 main.py - Main entry point for the RBM_Tool
 
 This module orchestrates the entire process:
-1. Read input files using inputs.py
-2. Process trades using calculations.py
-3. Write output files using outputs.py
+1. Read input files using inputs.py (GT_Valo.csv, Rep_Sensi.csv, Offsetting.csv)
+2. Process trades using calculations.py (identify, match, optimize)
+3. Write output files using outputs.py (detailed tables and summary)
 """
 
 import os
@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from inputs import read_and_validate_input
 from calculations import process_all_trades
-from outputs import write_results, write_detailed_outputs
+from outputs import write_all_outputs
 
 # Configure logging
 logging.basicConfig(
@@ -31,18 +31,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def main(input_dir: str = 'data/input/', filename: str = 'GT_Valo.csv',
-         output_dir: str = 'data/output/', detailed: bool = False) -> bool:
+def main(input_dir: str = 'data/input/', output_dir: str = 'data/output/',
+         use_samples: bool = False) -> bool:
     """
     Main function to execute the entire RBM_Tool workflow.
     
     Args:
         input_dir (str): Directory containing input files
-        filename (str): Name of the input file to process
         output_dir (str): Directory to write output files
-        detailed (bool): If True, write detailed output files (internal, external, summary)
-                       If False, write only the summary file
-    
+        use_samples (bool): If True, use sample data from data/samples/
+        
     Returns:
         bool: True if the entire workflow completed successfully
     """
@@ -52,37 +50,37 @@ def main(input_dir: str = 'data/input/', filename: str = 'GT_Valo.csv',
     
     try:
         # Step 1: Read and validate input
-        logger.info(f"\nStep 1: Reading input file '{filename}' from {input_dir}")
-        df = read_and_validate_input(input_dir, filename)
+        logger.info(f"\nStep 1: Reading input files")
         
-        if df is None:
-            logger.error("Failed to read or validate input file. Aborting.")
+        if use_samples:
+            data = read_and_validate_input(input_dir='data/samples/')
+        else:
+            data = read_and_validate_input(input_dir=input_dir)
+        
+        if data is None:
+            logger.error("Failed to read or validate input files. Aborting.")
             return False
         
-        logger.info(f"Successfully loaded {len(df)} trades from input file")
+        logger.info(f"Successfully loaded input data:")
+        logger.info(f"  - GT_Valo: {len(data['gt_valo'])} trades")
+        logger.info(f"  - Rep_Sensi: {len(data['rep_sensi'])} sensitivity records")
+        logger.info(f"  - Offsetting: {len(data['offsetting'])} PnL records")
         
-        # Step 2: Process trades
-        logger.info("\nStep 2: Processing trades...")
-        internal_trades, external_trades, combined_summary = process_all_trades(df)
+        # Step 2: Process trades and perform matching
+        logger.info(f"\nStep 2: Processing trades and performing matching...")
+        results = process_all_trades(data)
         
-        if combined_summary.empty:
-            logger.error("No summary data generated. Aborting.")
+        if not results:
+            logger.error("No results generated. Aborting.")
             return False
         
-        logger.info(f"Processing complete:")
-        logger.info(f"  - Internal trades: {len(internal_trades)}")
-        logger.info(f"  - External trades: {len(external_trades)}")
-        logger.info(f"  - Summary rows: {len(combined_summary)}")
+        logger.info(f"Processing complete. Generated {len(results)} result tables:")
+        for name, df in results.items():
+            logger.info(f"  - {name}: {len(df)} rows")
         
         # Step 3: Write output
-        logger.info(f"\nStep 3: Writing output to {output_dir}")
-        
-        if detailed:
-            success = write_detailed_outputs(internal_trades, external_trades, 
-                                            combined_summary, output_dir)
-        else:
-            success = write_results(internal_trades, external_trades, 
-                                   combined_summary, output_dir)
+        logger.info(f"\nStep 3: Writing output files to {output_dir}")
+        success = write_all_outputs(results, output_dir)
         
         if success:
             logger.info("\n" + "="*60)
@@ -98,6 +96,8 @@ def main(input_dir: str = 'data/input/', filename: str = 'GT_Valo.csv',
         logger.error("\n" + "="*60)
         logger.error("RBM_TOOL - Processing failed!")
         logger.error("="*60)
+        import traceback
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
         return False
 
 
@@ -111,7 +111,7 @@ def parse_arguments():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description='RBM_Tool - Process trade data and generate reports'
+        description='RBM_Tool - Process trade data, perform matching, and generate reports'
     )
     
     parser.add_argument(
@@ -122,13 +122,6 @@ def parse_arguments():
     )
     
     parser.add_argument(
-        '--filename',
-        type=str,
-        default='GT_Valo.csv',
-        help='Name of the input file (default: GT_Valo.csv)'
-    )
-    
-    parser.add_argument(
         '--output-dir',
         type=str,
         default='data/output/',
@@ -136,15 +129,9 @@ def parse_arguments():
     )
     
     parser.add_argument(
-        '--detailed',
+        '--samples',
         action='store_true',
-        help='Write detailed output files (internal, external, summary)'
-    )
-    
-    parser.add_argument(
-        '--sample',
-        action='store_true',
-        help='Use sample data from data/samples/GT_Valo.csv'
+        help='Use sample data from data/samples/ instead of input directory'
     )
     
     parser.add_argument(
@@ -157,10 +144,8 @@ def parse_arguments():
     
     return {
         'input_dir': args.input_dir,
-        'filename': args.filename,
         'output_dir': args.output_dir,
-        'detailed': args.detailed,
-        'sample': args.sample,
+        'use_samples': args.samples,
         'verbose': args.verbose
     }
 
@@ -175,19 +160,13 @@ if __name__ == "__main__":
     else:
         logging.getLogger().setLevel(logging.INFO)
     
-    # Use sample data if requested
-    if args['sample']:
-        args['input_dir'] = 'data/samples/'
-        args['filename'] = 'GT_Valo.csv'
-    
     logger.info(f"Starting RBM_Tool with arguments: {args}")
     
     # Run main workflow
     success = main(
         input_dir=args['input_dir'],
-        filename=args['filename'],
         output_dir=args['output_dir'],
-        detailed=args['detailed']
+        use_samples=args.get('use_samples', False)
     )
     
     # Exit with appropriate code

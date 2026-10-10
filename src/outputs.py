@@ -3,7 +3,11 @@ outputs.py - Module for generating output files
 
 This module handles:
 - Writing results to CSV files in the output directory
-- Formatting the output as specified: Internal trades et MTM, External trades et MTM
+- Generating detailed tables for:
+  - Internal Sub-Portfolios with sensitivities
+  - Matched trades between internal and external
+  - External trade usage percentages
+  - Unmatched sensitivities
 - Creating timestamped output files
 """
 
@@ -11,7 +15,7 @@ import pandas as pd
 import os
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 
 # Configure logging for debug messages
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -41,7 +45,7 @@ def generate_output_filename(prefix: str = 'resultats', output_dir: str = 'data/
     """
     Generate a timestamped output filename.
     
-    Format: resultats[YYYYMMDD].csv
+    Format: prefix_YYYYMMDD_HHMMSS.csv
     
     Args:
         prefix (str): Prefix for the filename (default: 'resultats')
@@ -51,9 +55,9 @@ def generate_output_filename(prefix: str = 'resultats', output_dir: str = 'data/
         str: Full path to the output file
     """
     try:
-        # Get current date in YYYYMMDD format
-        date_str = datetime.now().strftime('%Y%m%d')
-        filename = f"{prefix}{date_str}.csv"
+        # Get current date and time in YYYYMMDD_HHMMSS format
+        date_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{prefix}_{date_str}.csv"
         full_path = os.path.join(output_dir, filename)
         
         logger.info(f"Generated output filename: {full_path}")
@@ -61,44 +65,6 @@ def generate_output_filename(prefix: str = 'resultats', output_dir: str = 'data/
     except Exception as e:
         logger.error(f"Error generating output filename: {str(e)}")
         return os.path.join(output_dir, f"{prefix}_error.csv")
-
-
-def format_summary_for_output(summary_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Format the summary DataFrame for output.
-    
-    Ensures proper column ordering and formatting.
-    
-    Args:
-        summary_df (pd.DataFrame): Summary DataFrame from calculations
-        
-    Returns:
-        pd.DataFrame: Formatted DataFrame ready for output
-    """
-    try:
-        # Ensure required columns exist
-        required_columns = ['Trade_Type', 'CCY', 'Way', 'Count', 'Total_MTM']
-        
-        # Add any missing columns with default values
-        for col in required_columns:
-            if col not in summary_df.columns:
-                summary_df[col] = None
-        
-        # Reorder columns
-        formatted_df = summary_df[required_columns].copy()
-        
-        # Format numeric columns
-        if 'Count' in formatted_df.columns:
-            formatted_df['Count'] = formatted_df['Count'].astype(int)
-        if 'Total_MTM' in formatted_df.columns:
-            formatted_df['Total_MTM'] = formatted_df['Total_MTM'].round(2)
-        
-        logger.debug(f"Formatted summary for output:\n{formatted_df}")
-        return formatted_df
-        
-    except Exception as e:
-        logger.error(f"Error formatting summary for output: {str(e)}")
-        return pd.DataFrame()
 
 
 def write_csv_output(df: pd.DataFrame, file_path: str) -> bool:
@@ -118,8 +84,8 @@ def write_csv_output(df: pd.DataFrame, file_path: str) -> bool:
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
         
-        # Write to CSV
-        df.to_csv(file_path, index=False, sep=';', encoding='utf-8')
+        # Write to CSV with semicolon separator
+        df.to_csv(file_path, index=False, sep=';', encoding='utf-8', decimal=',')
         logger.info(f"Successfully wrote output to: {file_path}")
         return True
         
@@ -128,17 +94,46 @@ def write_csv_output(df: pd.DataFrame, file_path: str) -> bool:
         return False
 
 
-def write_results(internal_trades: pd.DataFrame, external_trades: pd.DataFrame, 
-                  combined_summary: pd.DataFrame, output_dir: str = 'data/output/') -> bool:
+def format_dataframe_for_output(df: pd.DataFrame, filename: str) -> pd.DataFrame:
+    """
+    Format a DataFrame for output with proper column ordering and formatting.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to format
+        filename (str): Name of the output file (for logging)
+        
+    Returns:
+        pd.DataFrame: Formatted DataFrame ready for output
+    """
+    try:
+        if df.empty:
+            logger.warning(f"DataFrame for {filename} is empty")
+            return df
+        
+        # Format numeric columns
+        for col in df.columns:
+            if df[col].dtype in ['float64', 'float32']:
+                df[col] = df[col].round(2)
+            elif df[col].dtype in ['int64', 'int32']:
+                df[col] = df[col].astype(int)
+        
+        logger.debug(f"Formatted DataFrame for {filename}:\n{df.head()}")
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error formatting DataFrame for {filename}: {str(e)}")
+        return pd.DataFrame()
+
+
+def write_results(results: Dict[str, pd.DataFrame], output_dir: str = 'data/output/') -> bool:
     """
     Main function to write all results to output files.
     
     This is the primary entry point for writing output data.
+    Generates separate files for each result type.
     
     Args:
-        internal_trades (pd.DataFrame): Internal trades DataFrame
-        external_trades (pd.DataFrame): External trades DataFrame
-        combined_summary (pd.DataFrame): Combined summary DataFrame
+        results (Dict[str, pd.DataFrame]): Dictionary with result DataFrames
         output_dir (str): Output directory path
         
     Returns:
@@ -151,117 +146,174 @@ def write_results(internal_trades: pd.DataFrame, external_trades: pd.DataFrame,
         if not ensure_output_directory(output_dir):
             return False
         
-        # Format the summary for output
-        formatted_summary = format_summary_for_output(combined_summary)
+        # Define output files
+        output_files = {
+            'internal_sub_portfolios': 'Internal_SubPortfolios',
+            'matched_trades': 'Matched_Trades',
+            'external_usage': 'External_Usage',
+            'unmatched_sensitivities': 'Unmatched_Sensitivities'
+        }
         
-        # Generate output filename
-        output_file = generate_output_filename('resultats', output_dir)
+        # Write each result to a separate file
+        written_files = []
+        for key, prefix in output_files.items():
+            if key in results and not results[key].empty:
+                formatted_df = format_dataframe_for_output(results[key], prefix)
+                output_file = generate_output_filename(prefix, output_dir)
+                success = write_csv_output(formatted_df, output_file)
+                if success:
+                    written_files.append(output_file)
+                    logger.info(f"Wrote {prefix}: {output_file}")
+            else:
+                logger.warning(f"No data for {key}, skipping")
         
-        # Write the formatted summary to CSV
-        success = write_csv_output(formatted_summary, output_file)
+        if written_files:
+            logger.info(f"\nSuccessfully wrote {len(written_files)} output files:")
+            for f in written_files:
+                logger.info(f"  - {f}")
         
-        if success:
-            logger.info(f"Output successfully written to: {output_file}")
-            logger.info(f"Output contains {len(formatted_summary)} summary rows")
-        
-        return success
+        return len(written_files) > 0
         
     except Exception as e:
         logger.error(f"Error in write_results: {str(e)}")
         return False
 
 
-def write_detailed_outputs(internal_trades: pd.DataFrame, external_trades: pd.DataFrame,
-                           combined_summary: pd.DataFrame, output_dir: str = 'data/output/') -> bool:
+def write_summary_report(results: Dict[str, pd.DataFrame], output_dir: str = 'data/output/') -> bool:
     """
-    Write detailed outputs including individual trade files and summary.
+    Write a comprehensive summary report combining all results.
     
     Args:
-        internal_trades (pd.DataFrame): Internal trades DataFrame
-        external_trades (pd.DataFrame): External trades DataFrame
-        combined_summary (pd.DataFrame): Combined summary DataFrame
+        results (Dict[str, pd.DataFrame]): Dictionary with result DataFrames
+        output_dir (str): Output directory path
+        
+    Returns:
+        bool: True if summary was written successfully
+    """
+    try:
+        logger.info("Writing summary report...")
+        
+        # Ensure output directory exists
+        if not ensure_output_directory(output_dir):
+            return False
+        
+        # Create summary DataFrame
+        summary_data = []
+        
+        # Internal Sub-Portfolios summary
+        if 'internal_sub_portfolios' in results and not results['internal_sub_portfolios'].empty:
+            internal_df = results['internal_sub_portfolios']
+            for sub_port in internal_df['SubPortfolio'].unique():
+                sub_port_df = internal_df[internal_df['SubPortfolio'] == sub_port]
+                total_delta = sub_port_df['Delta'].sum()
+                used_pct = sub_port_df['Used_Percentage'].mean()
+                
+                summary_data.append({
+                    'Category': 'Internal Sub-Portfolios',
+                    'Name': sub_port,
+                    'Count': len(sub_port_df),
+                    'Total_Delta': total_delta,
+                    'Avg_Usage_Pct': used_pct
+                })
+        
+        # Matched Trades summary
+        if 'matched_trades' in results and not results['matched_trades'].empty:
+            matched_df = results['matched_trades']
+            for _, row in matched_df.iterrows():
+                summary_data.append({
+                    'Category': 'Matched Trades',
+                    'Name': row['SubPortfolio'],
+                    'Internal_TranNums': row['Internal_TranNums'],
+                    'External_TranNum': row['External_TranNum'],
+                    'Usage_Pct': row['External_Usage_Percentage'],
+                    'Reduction': row['Reduction']
+                })
+        
+        # External Usage summary
+        if 'external_usage' in results and not results['external_usage'].empty:
+            external_df = results['external_usage']
+            for _, row in external_df.iterrows():
+                summary_data.append({
+                    'Category': 'External Usage',
+                    'TranNum': row['TranNum'],
+                    'ExternalParty': row['ExternalParty'],
+                    'CCY': row['CCY'],
+                    'PricingModel': row['PricingModel'],
+                    'Usage_Pct': row['Usage_Percentage']
+                })
+        
+        # Unmatched Sensitivities summary
+        if 'unmatched_sensitivities' in results and not results['unmatched_sensitivities'].empty:
+            unmatched_df = results['unmatched_sensitivities']
+            for _, row in unmatched_df.iterrows():
+                summary_data.append({
+                    'Category': 'Unmatched Sensitivities',
+                    'SubPortfolio': row['SubPortfolio'],
+                    'Index': row['Index'],
+                    'Tenor': row['Tenor'],
+                    'Delta': row['Delta']
+                })
+        
+        # Create summary DataFrame
+        summary_df = pd.DataFrame(summary_data)
+        
+        # Write summary to file
+        output_file = generate_output_filename('Summary_Report', output_dir)
+        formatted_df = format_dataframe_for_output(summary_df, 'Summary_Report')
+        success = write_csv_output(formatted_df, output_file)
+        
+        if success:
+            logger.info(f"Summary report written to: {output_file}")
+        
+        return success
+        
+    except Exception as e:
+        logger.error(f"Error writing summary report: {str(e)}")
+        return False
+
+
+def write_all_outputs(results: Dict[str, pd.DataFrame], output_dir: str = 'data/output/') -> bool:
+    """
+    Write all outputs including detailed files and summary report.
+    
+    Args:
+        results (Dict[str, pd.DataFrame]): Dictionary with result DataFrames
         output_dir (str): Output directory path
         
     Returns:
         bool: True if all outputs were written successfully
     """
     try:
-        logger.info("Writing detailed output files...")
+        logger.info("Writing all output files...")
         
-        # Ensure output directory exists
-        if not ensure_output_directory(output_dir):
-            return False
+        # Write detailed results
+        detailed_success = write_results(results, output_dir)
         
-        # Generate date string for filenames
-        date_str = datetime.now().strftime('%Y%m%d')
+        # Write summary report
+        summary_success = write_summary_report(results, output_dir)
         
-        # Write Internal trades
-        internal_file = os.path.join(output_dir, f"internal_trades_{date_str}.csv")
-        write_csv_output(internal_trades, internal_file)
-        
-        # Write External trades
-        external_file = os.path.join(output_dir, f"external_trades_{date_str}.csv")
-        write_csv_output(external_trades, external_file)
-        
-        # Write combined summary
-        summary_file = os.path.join(output_dir, f"resultats_{date_str}.csv")
-        formatted_summary = format_summary_for_output(combined_summary)
-        write_csv_output(formatted_summary, summary_file)
-        
-        logger.info(f"Detailed outputs written:")
-        logger.info(f"  - Internal trades: {internal_file}")
-        logger.info(f"  - External trades: {external_file}")
-        logger.info(f"  - Summary: {summary_file}")
-        
-        return True
+        return detailed_success and summary_success
         
     except Exception as e:
-        logger.error(f"Error in write_detailed_outputs: {str(e)}")
+        logger.error(f"Error in write_all_outputs: {str(e)}")
         return False
 
 
 # Example usage (for testing)
 if __name__ == "__main__":
-    # Create sample data for testing
-    sample_summary = pd.DataFrame({
-        'Trade_Type': ['Internal', 'Internal', 'External', 'External'],
-        'CCY': ['EUR', 'GBP', 'EUR', 'GBP'],
-        'Way': ['Pay', 'Rec', 'Pay', 'Rec'],
-        'Count': [3, 2, 5, 4],
-        'Total_MTM': [15000.0, 20000.0, 25000.0, 30000.0]
-    })
+    from calculations import process_all_trades
+    from inputs import read_and_validate_input
     
-    sample_internal = pd.DataFrame({
-        'TranNum': [1, 2, 3],
-        'InsNum': [101, 102, 103],
-        'ExternalParty': ['CLFRFRPP', 'CLFXYZ', 'FSAABC'],
-        'MTM': [1000.0, 2000.0, 3000.0],
-        'CCY': ['EUR', 'EUR', 'GBP'],
-        'Way': ['Pay', 'Pay', 'Rec']
-    })
+    # Test with sample data
+    data = read_and_validate_input(input_dir='../data/samples/')
     
-    sample_external = pd.DataFrame({
-        'TranNum': [4, 5, 6, 7, 8],
-        'InsNum': [104, 105, 106, 107, 108],
-        'ExternalParty': ['Bank', 'Bank', 'Bank', 'Bank', 'Bank'],
-        'MTM': [4000.0, 5000.0, 6000.0, 7000.0, 8000.0],
-        'CCY': ['EUR', 'EUR', 'EUR', 'GBP', 'GBP'],
-        'Way': ['Pay', 'Pay', 'Pay', 'Rec', 'Rec']
-    })
-    
-    print("\n" + "="*50)
-    print("TESTING OUTPUTS MODULE")
-    print("="*50)
-    
-    # Test formatting
-    formatted = format_summary_for_output(sample_summary)
-    print(f"\nFormatted summary:\n{formatted}")
-    
-    # Test writing (to a test directory)
-    test_dir = '../data/output_test/'
-    success = write_results(sample_internal, sample_external, sample_summary, test_dir)
-    print(f"\nWrite results test: {'SUCCESS' if success else 'FAILED'}")
-    
-    # Test detailed outputs
-    success = write_detailed_outputs(sample_internal, sample_external, sample_summary, test_dir)
-    print(f"Write detailed outputs test: {'SUCCESS' if success else 'FAILED'}")
+    if data:
+        results = process_all_trades(data)
+        
+        print("\n" + "="*50)
+        print("TESTING OUTPUTS MODULE")
+        print("="*50)
+        
+        # Test writing
+        success = write_all_outputs(results, output_dir='../data/output_test/')
+        print(f"\nWrite all outputs test: {'SUCCESS' if success else 'FAILED'}")
