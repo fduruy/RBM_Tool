@@ -84,8 +84,8 @@ def write_csv_output(df: pd.DataFrame, file_path: str) -> bool:
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
         
-        # Write to CSV with semicolon separator
-        df.to_csv(file_path, index=False, sep=';', encoding='utf-8', decimal=',')
+        # Write to CSV with semicolon separator and English decimal format (dot)
+        df.to_csv(file_path, index=False, sep=';', encoding='utf-8', decimal='.')
         logger.info(f"Successfully wrote output to: {file_path}")
         return True
         
