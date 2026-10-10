@@ -313,8 +313,8 @@ class PortfolioMatcher:
                             if abs(sub_port.TotalSensitivity[(index, tenor)]) < 0.01:
                                 del sub_port.TotalSensitivity[(index, tenor)]
                     
-                    logger.info(f"  Iteration {iteration + 1}: Matched with trade {best_trade.TranNum}, reduction: {reduction:.2f}")
-                    logger.info(f"  Remaining sensitivities: {len(sub_port.TotalSensitivity)}")
+                    #logger.info(f"  Iteration {iteration + 1}: Matched with trade {best_trade.TranNum}, reduction: {reduction:.2f}")
+                    #logger.info(f"  Remaining sensitivities: {len(sub_port.TotalSensitivity)}")
                     
                     iteration += 1
                 
