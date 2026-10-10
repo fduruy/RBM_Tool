@@ -4,7 +4,7 @@ outputs.py - Module for generating output files
 This module handles:
 - Writing results to CSV files in the output directory
 - Generating detailed tables for:
-  - Internal Sub-Portfolios with sensitivities
+  - Internal Sub-Portfolios with aggregated sensitivities (NO TranNum column)
   - Matched trades between internal and external
   - External trade usage percentages
   - Unmatched sensitivities
@@ -110,7 +110,7 @@ def format_dataframe_for_output(df: pd.DataFrame, filename: str) -> pd.DataFrame
             logger.warning(f"DataFrame for {filename} is empty")
             return df
         
-        # Format numeric columns
+        # Format numeric columns - ensure English decimal format
         for col in df.columns:
             if df[col].dtype in ['float64', 'float32']:
                 df[col] = df[col].round(2)
@@ -206,14 +206,13 @@ def write_summary_report(results: Dict[str, pd.DataFrame], output_dir: str = 'da
             for sub_port in internal_df['SubPortfolio'].unique():
                 sub_port_df = internal_df[internal_df['SubPortfolio'] == sub_port]
                 total_delta = sub_port_df['Delta'].sum()
-                used_pct = sub_port_df['Used_Percentage'].mean()
+                num_sensi = len(sub_port_df)
                 
                 summary_data.append({
                     'Category': 'Internal Sub-Portfolios',
                     'Name': sub_port,
-                    'Count': len(sub_port_df),
-                    'Total_Delta': total_delta,
-                    'Avg_Usage_Pct': used_pct
+                    'Sensitivity_Count': num_sensi,
+                    'Total_Delta': total_delta
                 })
         
         # Matched Trades summary
@@ -222,8 +221,7 @@ def write_summary_report(results: Dict[str, pd.DataFrame], output_dir: str = 'da
             for _, row in matched_df.iterrows():
                 summary_data.append({
                     'Category': 'Matched Trades',
-                    'Name': row['SubPortfolio'],
-                    'Internal_TranNums': row['Internal_TranNums'],
+                    'SubPortfolio': row['SubPortfolio'],
                     'External_TranNum': row['External_TranNum'],
                     'Usage_Pct': row['External_Usage_Percentage'],
                     'Reduction': row['Reduction']
