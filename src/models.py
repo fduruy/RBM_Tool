@@ -68,9 +68,11 @@ class SubPortfolio:
         Name (str): Sub-portfolio name (format: CCY_PricingModel_Way)
         Trades (List[TradeInfo]): List of trades in this sub-portfolio
         Sensitivities (List[SensitivityRecord]): List of sensitivity records
-        TotalSensitivity (Dict[Tuple[str, str], float]): Aggregated sensitivity per (Index, Tenor)
+        InitialSensitivity (Dict[Tuple[str, str], float]): Initial aggregated sensitivity per (Index, Tenor)
+        TotalSensitivity (Dict[Tuple[str, str], float]): Current aggregated sensitivity per (Index, Tenor)
     """
     Name: str
     Trades: List[TradeInfo]
     Sensitivities: List[SensitivityRecord]
+    InitialSensitivity: Dict[Tuple[str, str], float] = field(default_factory=dict)
     TotalSensitivity: Dict[Tuple[str, str], float] = field(default_factory=dict)

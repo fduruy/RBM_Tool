@@ -82,6 +82,8 @@ class PortfolioMatcher:
                         delta = parse_numeric_value(row['Delta'])
                         sensi_dict[(index, tenor)] += delta
                 
+                # Store BOTH initial and current sensitivity (same at creation)
+                sub_port.InitialSensitivity = dict(sensi_dict)
                 sub_port.TotalSensitivity = dict(sensi_dict)
                 
                 self.sub_portfolios[key] = sub_port
@@ -343,17 +345,16 @@ class PortfolioMatcher:
         
         Returns:
             Dict[str, pd.DataFrame]: Dictionary with keys:
-                - 'internal_sub_portfolios' (NO TranNum column, only aggregated sensitivities)
+                - 'internal_sub_portfolios' (INITIAL sensitivities - before matching)
                 - 'matched_trades'
                 - 'external_usage'
-                - 'unmatched_sensitivities'
+                - 'unmatched_sensitivities' (REMAINING sensitivities - after matching)
         """
         try:
-            # Create Internal Sub-Portfolios table WITHOUT TranNum column
-            # Only show aggregated sensitivities per SubPortfolio, Index, Tenor
+            # Create Internal Sub-Portfolios table - USE INITIAL SENSITIVITIES (before matching)
             internal_sub_portfolios_data = []
             for sub_port_name, sub_port in self.sub_portfolios.items():
-                for (index, tenor), delta in sub_port.TotalSensitivity.items():
+                for (index, tenor), delta in sub_port.InitialSensitivity.items():
                     internal_sub_portfolios_data.append({
                         'SubPortfolio': sub_port_name,
                         'Index': index,
@@ -392,7 +393,7 @@ class PortfolioMatcher:
             
             external_usage_df = pd.DataFrame(external_usage_data)
             
-            # Create Unmatched Sensitivities table
+            # Create Unmatched Sensitivities table - USE REMAINING SENSITIVITIES (after matching)
             unmatched_data = []
             for sub_port_name, sub_port in self.sub_portfolios.items():
                 for (index, tenor), delta in sub_port.TotalSensitivity.items():
