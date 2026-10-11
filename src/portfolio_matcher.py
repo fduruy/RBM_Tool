@@ -446,9 +446,13 @@ class PortfolioMatcher:
             external_usage_df = pd.DataFrame(external_usage_data)
             
             # Create Unmatched Sensitivities table - USE REMAINING SENSITIVITIES (after matching)
+            # Include ALL sensitivity pairs (even if zero) for visual check
             unmatched_data = []
             for sub_port_name, sub_port in self.sub_portfolios.items():
-                for (index, tenor), delta in sub_port.TotalSensitivity.items():
+                # Get all Index/Tenor pairs from InitialSensitivity (to keep same structure)
+                for (index, tenor) in sub_port.InitialSensitivity.keys():
+                    # Get current sensitivity (from TotalSensitivity if exists, else 0)
+                    delta = sub_port.TotalSensitivity.get((index, tenor), 0.0)
                     unmatched_data.append({
                         'SubPortfolio': sub_port_name,
                         'Index': index,
