@@ -45,7 +45,7 @@ def generate_output_filename(prefix: str = 'resultats', output_dir: str = 'data/
     """
     Generate a timestamped output filename.
     
-    Format: prefix_YYYYMMDD_HHMMSS.csv
+    Format: prefix[YYYYMMDD].csv (e.g., resultats20261011.csv)
     
     Args:
         prefix (str): Prefix for the filename (default: 'resultats')
@@ -55,9 +55,9 @@ def generate_output_filename(prefix: str = 'resultats', output_dir: str = 'data/
         str: Full path to the output file
     """
     try:
-        # Get current date and time in YYYYMMDD_HHMMSS format
-        #date_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{prefix}.csv"
+        # Get current date in YYYYMMDD format
+        date_str = datetime.now().strftime('%Y%m%d')
+        filename = f"{prefix}{date_str}.csv"
         full_path = os.path.join(output_dir, filename)
         
         logger.info(f"Generated output filename: {full_path}")
@@ -272,7 +272,7 @@ def write_summary_report(results: Dict[str, pd.DataFrame], output_dir: str = 'da
 
 def write_all_outputs(results: Dict[str, pd.DataFrame], output_dir: str = 'data/output/') -> bool:
     """
-    Write all outputs including detailed files and summary report.
+    Write all outputs including detailed files.
     
     Args:
         results (Dict[str, pd.DataFrame]): Dictionary with result DataFrames
@@ -284,13 +284,8 @@ def write_all_outputs(results: Dict[str, pd.DataFrame], output_dir: str = 'data/
     try:
         logger.info("Writing all output files...")
         
-        # Write detailed results
-        detailed_success = write_results(results, output_dir)
-        
-        # Write summary report
-        summary_success = write_summary_report(results, output_dir)
-        
-        return detailed_success and summary_success
+        # Write detailed results only (no summary report)
+        return write_results(results, output_dir)
         
     except Exception as e:
         logger.error(f"Error in write_all_outputs: {str(e)}")

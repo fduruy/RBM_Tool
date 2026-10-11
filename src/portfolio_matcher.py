@@ -53,6 +53,58 @@ class PortfolioMatcher:
         self.matched_results: List[Dict] = []
         self.external_usage: Dict[int, float] = {}  # TranNum -> usage percentage (0.0 to 1.0)
         
+        # Pre-compute and cache external trade sensitivities for performance
+        self.external_sensitivities_cache: Dict[int, List[SensitivityRecord]] = {}
+        self.external_max_gpt_id: Dict[int, int] = {}
+        self._precompute_external_cache()
+        
+        # Pre-sort external trades by max Gpt_Id descending for efficient iteration
+        self.sorted_external_trades: List[TradeInfo] = []
+        self._sort_external_trades()
+        
+    def _precompute_external_cache(self) -> None:
+        """
+        Pre-compute and cache external trade sensitivities and max Gpt_Id for performance.
+        This avoids repeated DataFrame lookups during matching.
+        """
+        try:
+            for trade in self.external_trades:
+                trade_sensi = self.rep_sensi[self.rep_sensi['TranNum'] == trade.TranNum]
+                sensitivities = []
+                max_gpt_id = 0
+                for _, row in trade_sensi.iterrows():
+                    sensi = SensitivityRecord(
+                        TranNum=row['TranNum'],
+                        InsNum=row['InsNum'],
+                        Index=row['Index'],
+                        Tenor=row['Tenor'],
+                        Gpt_Id=int(row['Gpt_Id']),
+                        Delta=parse_numeric_value(row['Delta'])
+                    )
+                    sensitivities.append(sensi)
+                    if int(row['Gpt_Id']) > max_gpt_id:
+                        max_gpt_id = int(row['Gpt_Id'])
+                self.external_sensitivities_cache[trade.TranNum] = sensitivities
+                self.external_max_gpt_id[trade.TranNum] = max_gpt_id
+        except Exception as e:
+            logger.error(f"Error precomputing external cache: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            
+    def _sort_external_trades(self) -> None:
+        """
+        Pre-sort external trades by max Gpt_Id descending for efficient iteration.
+        """
+        try:
+            self.sorted_external_trades = sorted(
+                self.external_trades,
+                key=lambda t: self.external_max_gpt_id.get(t.TranNum, 0),
+                reverse=True
+            )
+        except Exception as e:
+            logger.error(f"Error sorting external trades: {str(e)}")
+            self.sorted_external_trades = self.external_trades.copy()
+        
     def create_sub_portfolios(self) -> Dict[str, SubPortfolio]:
         """
         Create Internal Sub-Portfolios grouped by CCY, PricingModel, and WAY.
@@ -118,6 +170,7 @@ class PortfolioMatcher:
     def get_external_sensitivities(self, trade: TradeInfo) -> List[SensitivityRecord]:
         """
         Get sensitivity records for an external trade.
+        Uses pre-computed cache for performance.
         
         Args:
             trade (TradeInfo): External trade
@@ -125,22 +178,11 @@ class PortfolioMatcher:
         Returns:
             List[SensitivityRecord]: Sensitivity records for this trade
         """
-        trade_sensi = self.rep_sensi[self.rep_sensi['TranNum'] == trade.TranNum]
-        sensitivities = []
-        for _, row in trade_sensi.iterrows():
-            sensi = SensitivityRecord(
-                TranNum=row['TranNum'],
-                InsNum=row['InsNum'],
-                Index=row['Index'],
-                Tenor=row['Tenor'],
-                Gpt_Id=int(row['Gpt_Id']),
-                Delta=parse_numeric_value(row['Delta'])
-            )
-            sensitivities.append(sensi)
-        return sensitivities
+        return self.external_sensitivities_cache.get(trade.TranNum, [])
     
     def calculate_sensitivity_reduction(self, sub_port: SubPortfolio, external_trade: TradeInfo,
-                                       external_sensi: List[SensitivityRecord]) -> float:
+                                       external_sensi: List[SensitivityRecord], 
+                                       remaining_usage: float = 1.0) -> float:
         """
         Calculate how much sensitivity would be reduced by matching with an external trade.
         Only considers sensitivities with the same Index and Tenor.
@@ -153,14 +195,15 @@ class PortfolioMatcher:
             sub_port (SubPortfolio): Internal sub-portfolio
             external_trade (TradeInfo): External trade to match with
             external_sensi (List[SensitivityRecord]): Sensitivities of the external trade
+            remaining_usage (float): Remaining usage percentage (0.0 to 1.0) of the external trade
             
         Returns:
             float: Total sensitivity reduction score (higher is better)
         """
-        # Create a dictionary of external sensitivities
+        # Create a dictionary of external sensitivities, adjusted by remaining usage
         external_sensi_dict = defaultdict(float)
         for sensi in external_sensi:
-            external_sensi_dict[(sensi.Index, sensi.Tenor)] += sensi.Delta
+            external_sensi_dict[(sensi.Index, sensi.Tenor)] += sensi.Delta * remaining_usage
         
         # Calculate reduction for matching sensitivities
         reduction = 0.0
@@ -172,10 +215,6 @@ class PortfolioMatcher:
                     # Sensitivities have opposite signs, can offset
                     reduction += min(abs(delta), abs(external_delta))
         
-        # Debug logging
-        if reduction > 0:
-            logger.debug(f"  Trade {external_trade.TranNum} (Way={external_trade.Way}) can reduce by {reduction:.2f}")
-        
         return reduction
     
     def find_best_match(self, sub_port: SubPortfolio) -> Tuple[Optional[TradeInfo], List[SensitivityRecord], float]:
@@ -183,6 +222,8 @@ class PortfolioMatcher:
         Find the best external trade to match with a sub-portfolio.
         Uses the algorithm: find external trades with opposite WAY that have matching Index/Tenor
         and reduce the sub-portfolio's total absolute sensitivity.
+        
+        Optimized to use pre-computed caches and only iterate through relevant trades.
         
         Args:
             sub_port (SubPortfolio): Internal sub-portfolio to match
@@ -197,71 +238,40 @@ class PortfolioMatcher:
         
         sub_port_way = parts[2]
         
-        # Get ALL external trades with opposite WAY
-        # Note: CCY and PricingModel don't need to match between sub-portfolio and external trade
-        # as long as the Index and Tenor match with opposite WAY
-        matching_trades = []
-        for trade in self.external_trades:
-            if trade.Way != sub_port_way:
-                matching_trades.append(trade)
-        
-        if not matching_trades:
-            logger.info(f"No external trades with opposite WAY found for sub-portfolio: {sub_port.Name}")
-            return None, [], 0.0
-        
-        # Sort external trades by highest Gpt_Id (from Rep_Sensi) descending
-        trade_gpt_ids = {}
-        for trade in matching_trades:
-            trade_sensi = self.rep_sensi[self.rep_sensi['TranNum'] == trade.TranNum]
-            if not trade_sensi.empty:
-                max_gpt_id = trade_sensi['Gpt_Id'].max()
-                trade_gpt_ids[trade.TranNum] = max_gpt_id
-            else:
-                trade_gpt_ids[trade.TranNum] = 0
-        
-        # Sort by Gpt_Id descending
-        sorted_trades = sorted(
-            matching_trades,
-            key=lambda t: trade_gpt_ids.get(t.TranNum, 0),
-            reverse=True
-        )
-        
-        # Find the trade with maximum sensitivity reduction
+        # Use pre-sorted external trades and filter by opposite WAY
+        # This avoids sorting in every iteration
         best_trade = None
         best_sensi = []
         best_reduction = 0.0
         
-        for trade in sorted_trades:
-            # Skip if already fully used
-            if self.external_usage.get(trade.TranNum, 0.0) >= 1.0:
+        for trade in self.sorted_external_trades:
+            # Skip if not opposite WAY
+            if trade.Way == sub_port_way:
                 continue
-                
-            external_sensi = self.get_external_sensitivities(trade)
             
-            # Adjust sensitivities by remaining usage (1 - current_usage)
-            remaining_usage = 1.0 - self.external_usage.get(trade.TranNum, 0.0)
-            adjusted_sensi = []
-            for sensi in external_sensi:
-                adjusted_sensi_record = SensitivityRecord(
-                    TranNum=sensi.TranNum,
-                    InsNum=sensi.InsNum,
-                    Index=sensi.Index,
-                    Tenor=sensi.Tenor,
-                    Gpt_Id=sensi.Gpt_Id,
-                    Delta=sensi.Delta * remaining_usage
-                )
-                adjusted_sensi.append(adjusted_sensi_record)
+            # Skip if already fully used
+            current_usage = self.external_usage.get(trade.TranNum, 0.0)
+            if current_usage >= 1.0:
+                continue
             
-            reduction = self.calculate_sensitivity_reduction(sub_port, trade, adjusted_sensi)
+            # Get cached sensitivities
+            external_sensi = self.external_sensitivities_cache.get(trade.TranNum, [])
+            if not external_sensi:
+                continue
             
-            logger.debug(f"  Trade {trade.TranNum} (Way={trade.Way}, CCY={trade.CCY}, PM={trade.PricingModel}, usage={self.external_usage.get(trade.TranNum, 0.0):.2%}): reduction={reduction:.2f}")
+            # Calculate remaining usage
+            remaining_usage = 1.0 - current_usage
+            
+            # Calculate reduction directly (no need to create adjusted SensitivityRecord objects)
+            reduction = self.calculate_sensitivity_reduction(
+                sub_port, trade, external_sensi, remaining_usage
+            )
             
             if reduction > best_reduction:
                 best_reduction = reduction
                 best_trade = trade
-                best_sensi = external_sensi  # Return original sensitivities (not adjusted)
+                best_sensi = external_sensi
         
-        logger.debug(f"  Best reduction for {sub_port.Name}: {best_reduction:.2f}")
         return best_trade, best_sensi, best_reduction
     
     def match_portfolios(self) -> Dict[str, pd.DataFrame]:
@@ -319,33 +329,19 @@ class PortfolioMatcher:
                     # Update usage
                     self.external_usage[best_trade.TranNum] = usage
                     
-                    # Record the match
+                    # Record the match - only store essential info to reduce memory
                     match_record = {
                         'SubPortfolio': sub_port_name,
                         'External_TranNum': best_trade.TranNum,
-                        'External_Usage': usage,
-                        'Reduction': best_reduction,
-                        'Index_Tenor_Matches': []
+                        'External_Usage_Percentage': usage * 100,  # Store as percentage
+                        'Reduction': best_reduction
                     }
-                    
-                    # Find which sensitivities were matched
-                    external_sensi_dict = defaultdict(float)
-                    for sensi in external_sensi:
-                        external_sensi_dict[(sensi.Index, sensi.Tenor)] += sensi.Delta
-                    
-                    for (index, tenor), delta in sub_port.TotalSensitivity.items():
-                        if (index, tenor) in external_sensi_dict:
-                            match_record['Index_Tenor_Matches'].append({
-                                'Index': index,
-                                'Tenor': tenor,
-                                'Internal_Delta': delta,
-                                'External_Delta': external_sensi_dict[(index, tenor)]
-                            })
                     
                     self.matched_results.append(match_record)
                     
                     # Update sub-portfolio sensitivities (reduce by matched amount)
                     # We need to properly offset sensitivities with opposite signs
+                    # Only iterate through sensitivities that actually match
                     for (index, tenor), delta in list(sub_port.TotalSensitivity.items()):
                         if (index, tenor) in external_sensi_dict:
                             external_delta = external_sensi_dict[(index, tenor)]
@@ -362,9 +358,6 @@ class PortfolioMatcher:
                                 # Remove if close to zero
                                 if abs(sub_port.TotalSensitivity[(index, tenor)]) < 0.01:
                                     del sub_port.TotalSensitivity[(index, tenor)]
-                            else:
-                                # Same sign, would increase sensitivity - don't match
-                                pass
                     
                     logger.info(f"  Iteration {iteration + 1}: Matched with trade {best_trade.TranNum}, reduction: {best_reduction:.2f}")
                     logger.info(f"  Remaining sensitivity pairs: {len(sub_port.TotalSensitivity)}")
@@ -423,7 +416,7 @@ class PortfolioMatcher:
                     matched_trades_data.append({
                         'SubPortfolio': record['SubPortfolio'],
                         'External_TranNum': record['External_TranNum'],
-                        'External_Usage_Percentage': record['External_Usage'],
+                        'External_Usage_Percentage': record['External_Usage_Percentage'],
                         'Reduction': record['Reduction']
                     })
             
