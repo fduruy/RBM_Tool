@@ -423,7 +423,7 @@ class PortfolioMatcher:
                     matched_trades_data.append({
                         'SubPortfolio': record['SubPortfolio'],
                         'External_TranNum': record['External_TranNum'],
-                        'External_Usage_Percentage': record['External_Usage'] * 100,
+                        'External_Usage_Percentage': record['External_Usage'],
                         'Reduction': record['Reduction']
                     })
             
@@ -440,7 +440,7 @@ class PortfolioMatcher:
                     'CCY': trade.CCY,
                     'PricingModel': trade.PricingModel,
                     'Way': trade.Way,
-                    'Usage_Percentage': usage * 100
+                    'Usage_Percentage': usage
                 })
             
             external_usage_df = pd.DataFrame(external_usage_data)

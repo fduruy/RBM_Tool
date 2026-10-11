@@ -56,8 +56,8 @@ def generate_output_filename(prefix: str = 'resultats', output_dir: str = 'data/
     """
     try:
         # Get current date and time in YYYYMMDD_HHMMSS format
-        date_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{prefix}_{date_str}.csv"
+        #date_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{prefix}.csv"
         full_path = os.path.join(output_dir, filename)
         
         logger.info(f"Generated output filename: {full_path}")
