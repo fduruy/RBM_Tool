@@ -17,20 +17,24 @@ Code everyting necessary in inputs.py using clear and understandable python lang
 [
     #3 Identify Internal trades (CLF* or FSA* in column ExternalParty of GT_Valo.csv) and regroup them by CCY, PricingModel and WAY (such as EUR_Discounting_Pay or GBP_Discounting_Rec or every possible combination CCY_PricingModel_WAY).
     #4 Identify External trades (using the same way as internal trades). 
-    #5 First Step: create a comprehensive tables per internal_sub_portfolio with the sensitivity ordered by Index and Gpt_Id. Sum sensitivity per Index and Gpt_ID. It is called Internal Sub_Portfolios
-    #6 Second Step : create a comprehensive table per external_trade 
+    #5 First Step: create a comprehensive tables for each internal_sub_portfolio for sensitivities ordered by Index and Gpt_Id. Sum sensitivities per Index and Gpt_ID. It is called Internal Sub_Portfolios sensitivities bucketing.
+    #6 Second Step : create a comprehensive table per external_trade, the same way. 
     
-    #7 Third Setp, The portfolio matching and optimization: For each Sub_Portfolios of internal trades we want to find the corresponding external trades that reduce the sensitivity by Index and Tenor amongst the list of external trades within the same group safe the WAY (Pay vs Rec). It is an iterative process. It must start by finding the trade that reduce the maximum of overall sensitivity (index and tenor) starting by the highest GPT_ID and going backward. For any iteration, if the totality of the trade is used then usage will be 100% and the trade cannot be used anymore for future matching. But it is possible to use only a portion of a trade between 0% abnd 100%, thus the remaining portion will be available for future matching if needed. 
-    #7 is the most important part of the code and will need clear and dedicated functions or objects
+    #7 Third Setp, The portfolio matching and optimization. For each Sub_Portfolios of internal trades we want to find the corresponding external trades that reduce the sensitivity by Index and Tenor (bucket) amongst the list of external trades within the same group safe the WAY (Pay vs Rec). It must be an iterative process. It must start by finding the trade that reduce the maximum of overall sensitivity (index and tenor) starting by the highest GPT_ID and going backward. For any iteration, if the totality of the trade is used then usage will be 100% and the trade cannot be used anymore for future matching. But it is possible to use only a portion of a trade between 0% abnd 100%, thus the remaining portion will be available for future matching if needed. 
+    It is the most important part of the code and will need clear and dedicated functions or class. The code must be optimized because it will be time consuming.
    
-    #8 at the end of #7, Create detailed tables of Internal Sub portfolio and their matching and remaining unmatched sensitivities. Create detailed tables of External trades and their % of usage. Create a detailed table for 
+    #8 at the end of #7, Create detailed tables of Internal Sub portfolio and their matching and remaining unmatched sensitivities. Create detailed tables of External trades and their % of usage. See OUTPUTS section.
 
 ]
 Code everyting necessary in calculations.py using clear and understandable python language with commented code for beginners. Error handling and proper debug message are mandatory
 
 - **OUTPUTS** : 
 [
-    #8Create outputs : data/output/resultats[YYYYMMDD.csv], summarize the resultas from Calculations in CSV
+    #8Create outputs : in data/output/ detailed resultas from Calculations in CSV.
+    - Internal_SubPortfolios.csv : detailed subportfolios (SubPortfolioName, Index, Tenor, Gpt_ID, sum(Delta per Index, Tenor))
+    - External_Usage.csv : detailed Trade usage for the matching (TranNum, Sub_Portfolio, Usage in %)
+    - Unmatched_Sensitivities.csv : remained sensitivities after mathcing (SubPortfolio, Index, Tenor, Gpt_Id, sum(Delta per Index, Tenor))
+    - Matched_Trades.csv : tbc
 ] 
 Code everyting necessary in outputs.py using clear and understandable python language with commented code for beginners. Error handling and proper debug message are mandatory
 
