@@ -14,6 +14,7 @@
         "Euribor6M",
         "Euribor12M",
         "Sonia", 
+        "IPCGBP",
         "SOFR",
         "FEDFUNDS"
       ],
@@ -27,10 +28,11 @@
         "EURIBOR6M": "Euribor6M",
         "EURIBOR12M": "Euribor12M",
         "ESTR": "Estr",
+        "EONIA": "Estr",
         "SONIA": "Sonia",
+        "UKRPI":"IPCGBP",
         "SOFR": "SOFR",
-        "FEDFUND": "FEDFUNDS",
-        "EONIA": "Estr"
+        "FEDFUND": "FEDFUNDS"
       },
       
       "validation": {
@@ -44,8 +46,8 @@
         "enable": false,
         "groups": {
           "EU_RATES": ["Estr", "Euribor1M","Euribor3M","Euribor6M","Euribor12M", "EONIA"],
-          "UK_RATES": ["Sonia"],
-          "US_RATES": ["SOFR", "Libor"]
+          "UK_RATES": ["Sonia","IPCGBP"],
+          "US_RATES": ["SOFR", "FEDFUNDS"]
         }
       }
     },
@@ -56,11 +58,11 @@
       "allowed_tenors": [
         "ON",
         "TN", 
+        "SN", 
         "SW",
         "1W",
         "2W",
         "3W",
-        "4W",
         "1M",
         "2M",
         "3M",
@@ -97,11 +99,9 @@
       
       "aliases": {
         "O/N": "ON",
-        "OVERNIGHT": "ON",
         "T/N": "TN",
-        "TOM/NEXT": "TN",
-        "SPOT/next": "SW",
-        "SPOT-NEXT": "SW",
+        "S/N": "SN",
+        "SW": "1W",
         "1 Week": "1W",
         "2 Weeks": "2W",
         "3 Weeks": "3W",
@@ -144,8 +144,8 @@
       
       "sorting": {
         "order": [
-          "ON", "TN", "SW",
-          "1W", "2W", "3W", "4W",
+          "ON", "TN", "SN",
+          "1W", "2W", "3W",
           "1M", "2M", "3M", "4M", "5M", "6M", "7M", "8M", "9M", "10M", "11M", "12M",
           "1Y", "2Y", "3Y", "4Y", "5Y", "6Y", "7Y", "8Y", "9Y", "10Y",
           "12Y", "15Y", "20Y", "25Y", "30Y", "40Y", "50Y"
@@ -264,7 +264,7 @@
         "algorithm": {
           "type": "iterative",
           "max_iterations": 100,
-          "tolerance": 0.01
+          "tolerance": 1000.0
         },
         
         "selection_criteria": {
@@ -275,7 +275,7 @@
         
         "sensitivity_matching": {
           "require_opposite_signs": true,
-          "matching_tolerance": 0.01,
+          "matching_tolerance": 1000.0,
           "usage_calculation": "proportional"
         },
         
