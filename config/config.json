@@ -28,7 +28,7 @@
         "EURIBOR6M": "Euribor6M",
         "EURIBOR12M": "Euribor12M",
         "ESTR": "Estr",
-        "EONIA": "Estr",
+        "EONIA": "EONIA",
         "SONIA": "Sonia",
         "UKRPI":"IPCGBP",
         "SOFR": "SOFR",
@@ -176,15 +176,15 @@
         
         "rules": [
           {
-            "name": "EUR_Inflation_Pay",
+            "name": "EUR_Discounting_Pay",
             "criteria": {
               "CCY": ["EUR"],
-              "PricingModel": ["Inflation"],
+              "PricingModel": ["Discounting"],
               "Way": ["Pay"]
             },
             "priority": 1,
             "matching_rules": {
-              "preferred_indexes": ["Estr", "Euribor"],
+              "preferred_indexes": ["Estr", "Eonia", "Euribor1M","Euribor3M","Euribor6M","Euribor12M"],
               "excluded_indexes": [],
               "min_sensitivity_threshold": 0.01,
               "max_usage_percentage": 1.0
@@ -192,15 +192,15 @@
             "excluded": false
           },
           {
-            "name": "EUR_Inflation_Rec",
+            "name": "EUR_Discounting_Rec",
             "criteria": {
               "CCY": ["EUR"],
-              "PricingModel": ["Inflation"],
+              "PricingModel": ["Discounting"],
               "Way": ["Rec"]
             },
             "priority": 1,
             "matching_rules": {
-              "preferred_indexes": ["Estr", "Euribor"],
+              "preferred_indexes": ["Estr", "Eonia", "Euribor1M","Euribor3M","Euribor6M","Euribor12M"],
               "excluded_indexes": [],
               "min_sensitivity_threshold": 0.01,
               "max_usage_percentage": 1.0
