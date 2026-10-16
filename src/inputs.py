@@ -220,7 +220,8 @@ def read_and_validate_input(input_dir: str = 'data/input/') -> Optional[Dict[str
     """
     Main function to read and validate all input files.
     
-    This is the primary entry point for reading input data.
+    This is the primary entry point for reading input data from files.
+    Use read_and_validate_input_from_db() to read from the SQLite database.
     
     Args:
         input_dir (str): Directory containing input files
@@ -284,6 +285,56 @@ def read_and_validate_input(input_dir: str = 'data/input/') -> Optional[Dict[str
         
     except Exception as e:
         logger.error(f"Error in read_and_validate_input: {str(e)}")
+        return None
+
+
+def read_and_validate_input_from_db(db_path: str) -> Optional[Dict[str, pd.DataFrame]]:
+    """
+    Read and validate all input tables from the SQLite database.
+
+    Applies the same validations and consistency checks as the CSV path.
+
+    Args:
+        db_path (str): Path to the SQLite database file
+
+    Returns:
+        Optional[Dict[str, pd.DataFrame]]: Dictionary with keys 'gt_valo', 'rep_sensi', 'offsetting'
+    """
+    try:
+        from database import load_inputs
+
+        logger.info(f"Reading input tables from SQLite database: {db_path}")
+        data = load_inputs(db_path)
+        if data is None:
+            logger.error("Could not load input tables from database")
+            return None
+
+        gt_valo_df = data['gt_valo']
+        rep_sensi_df = data['rep_sensi']
+        offsetting_df = data['offsetting']
+
+        gt_valid, gt_error = validate_gt_valo(gt_valo_df)
+        rep_valid, rep_error = validate_rep_sensi(rep_sensi_df)
+        offset_valid, offset_error = validate_offsetting(offsetting_df)
+
+        if not (gt_valid and rep_valid and offset_valid):
+            logger.error("One or more database tables failed validation")
+            return None
+
+        consistent, consistency_error = check_consistency(gt_valo_df, rep_sensi_df, offsetting_df)
+        if not consistent:
+            logger.error(f"Consistency check failed: {consistency_error}")
+            return None
+
+        logger.info("All input tables read and validated successfully from database")
+        logger.info(f"  - GT_Valo: {len(gt_valo_df)} trades")
+        logger.info(f"  - Rep_Sensi: {len(rep_sensi_df)} sensitivity records")
+        logger.info(f"  - Offsetting: {len(offsetting_df)} PnL records")
+
+        return data
+
+    except Exception as e:
+        logger.error(f"Error in read_and_validate_input_from_db: {str(e)}")
         return None
 
 

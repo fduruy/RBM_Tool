@@ -41,6 +41,9 @@ TABLE_KEYS = [
     'sub_portfolio_summary',
 ]
 
+# Input table keys that are persisted
+INPUT_TABLE_KEYS = ['gt_valo', 'rep_sensi', 'offsetting']
+
 
 def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     """
@@ -88,6 +91,68 @@ def save_results(results: Dict[str, pd.DataFrame],
     except Exception as e:
         logger.error(f"Error saving results to SQLite: {str(e)}")
         return False
+
+
+def save_inputs(data: Dict[str, pd.DataFrame],
+                 db_path: str = DEFAULT_DB_PATH) -> bool:
+    """
+    Save the input tables into the SQLite database (tables replaced each run).
+
+    Args:
+        data (Dict[str, pd.DataFrame]): Input DataFrames with keys
+            'gt_valo', 'rep_sensi', 'offsetting'
+        db_path (str): Path to the SQLite database file
+
+    Returns:
+        bool: True if all tables were saved successfully
+    """
+    try:
+        conn = get_connection(db_path)
+        try:
+            for key in INPUT_TABLE_KEYS:
+                df = data.get(key)
+                if df is None:
+                    logger.warning(f"Input table '{key}' missing, skipped")
+                    continue
+                df.to_sql(key, conn, if_exists='replace', index=False)
+                logger.info(f"Saved input table '{key}': {len(df)} rows")
+        finally:
+            conn.close()
+        logger.info("All input tables saved to SQLite successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving inputs to SQLite: {str(e)}")
+        return False
+
+
+def load_inputs(db_path: str = DEFAULT_DB_PATH) -> Optional[Dict[str, pd.DataFrame]]:
+    """
+    Load the input tables from the SQLite database.
+
+    Args:
+        db_path (str): Path to the SQLite database file
+
+    Returns:
+        Optional[Dict[str, pd.DataFrame]]: Dictionary with keys
+            'gt_valo', 'rep_sensi', 'offsetting', or None if a table is missing
+    """
+    try:
+        conn = get_connection(db_path)
+        try:
+            available = set(row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"))
+            missing = [k for k in INPUT_TABLE_KEYS if k not in available]
+            if missing:
+                logger.error(f"Input tables missing in database: {missing}")
+                return None
+            data = {k: pd.read_sql(f"SELECT * FROM {k}", conn) for k in INPUT_TABLE_KEYS}
+        finally:
+            conn.close()
+        logger.info("All input tables loaded from SQLite successfully")
+        return data
+    except Exception as e:
+        logger.error(f"Error loading inputs from SQLite: {str(e)}")
+        return None
 
 
 def read_table(table_name: str,

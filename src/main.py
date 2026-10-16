@@ -15,10 +15,10 @@ from typing import Optional
 # Add src directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from inputs import read_and_validate_input
+from inputs import read_and_validate_input, read_and_validate_input_from_db
 from calculations import process_all_trades
 from outputs import write_all_outputs
-from database import save_results
+from database import save_results, save_inputs
 
 # Configure logging
 logging.basicConfig(
@@ -32,16 +32,39 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def main(input_dir: str = 'data/input/', output_dir: str = 'data/output/',
-         use_samples: bool = False) -> bool:
+def init_db_from_files(input_dir: str, db_path: str) -> bool:
     """
-    Main function to execute the entire RBM_Tool workflow.
-    
+    Load input files (CSV/Excel) and store them as tables in the SQLite database.
+
     Args:
         input_dir (str): Directory containing input files
+        db_path (str): Path to the SQLite database file
+
+    Returns:
+        bool: True if inputs were saved to the database successfully
+    """
+    logger.info(f"Initializing database from input files: {input_dir}")
+    data = read_and_validate_input(input_dir=input_dir)
+    if data is None:
+        logger.error("Failed to read or validate input files. Aborting database init.")
+        return False
+    return save_inputs(data, db_path)
+
+
+def main(input_dir: str = 'data/input/', output_dir: str = 'data/output/',
+         use_samples: bool = False, init_db: bool = False) -> bool:
+    """
+    Main function to execute the entire RBM_Tool workflow.
+
+    Inputs are read from the SQLite database. Use --init-db once to populate
+    the database from input files.
+
+    Args:
+        input_dir (str): Directory containing input files (used with init_db)
         output_dir (str): Directory to write output files
         use_samples (bool): If True, use sample data from data/samples/
-        
+        init_db (bool): If True, (re)load the input files into the database first
+
     Returns:
         bool: True if the entire workflow completed successfully
     """
@@ -50,14 +73,22 @@ def main(input_dir: str = 'data/input/', output_dir: str = 'data/output/',
     logger.info("="*60)
     
     try:
-        # Step 1: Read and validate input
-        logger.info(f"\nStep 1: Reading input files")
-        
-        if use_samples:
-            data = read_and_validate_input(input_dir='data/samples/')
-        else:
-            data = read_and_validate_input(input_dir=input_dir)
-        
+        db_path = os.path.join(output_dir, 'rbm_results.db')
+
+        # Step 0 (optional): populate the database from input files
+        if init_db:
+            if use_samples:
+                ok = init_db_from_files('data/samples/', db_path)
+            else:
+                ok = init_db_from_files(input_dir, db_path)
+            if not ok:
+                logger.error("Database initialization failed. Aborting.")
+                return False
+
+        # Step 1: Read and validate input from the database
+        logger.info("\nStep 1: Reading input tables from SQLite database")
+        data = read_and_validate_input_from_db(db_path)
+
         if data is None:
             logger.error("Failed to read or validate input files. Aborting.")
             return False
@@ -85,7 +116,6 @@ def main(input_dir: str = 'data/input/', output_dir: str = 'data/output/',
 
         # Step 4: Save results to SQLite database (tables replaced each run)
         logger.info("\nStep 4: Saving result tables to SQLite database")
-        db_path = os.path.join(output_dir, 'rbm_results.db')
         db_success = save_results(results, db_path)
         if not db_success:
             logger.error("Failed to save results to SQLite database")
@@ -144,6 +174,12 @@ def parse_arguments():
     )
     
     parser.add_argument(
+        '--init-db',
+        action='store_true',
+        help='(Re)load input files into the SQLite database before running'
+    )
+
+    parser.add_argument(
         '--verbose',
         action='store_true',
         help='Enable verbose logging'
@@ -155,6 +191,7 @@ def parse_arguments():
         'input_dir': args.input_dir,
         'output_dir': args.output_dir,
         'use_samples': args.samples,
+        'init_db': args.init_db,
         'verbose': args.verbose
     }
 
@@ -175,7 +212,8 @@ if __name__ == "__main__":
     success = main(
         input_dir=args['input_dir'],
         output_dir=args['output_dir'],
-        use_samples=args.get('use_samples', False)
+        use_samples=args.get('use_samples', False),
+        init_db=args.get('init_db', False)
     )
     
     # Exit with appropriate code

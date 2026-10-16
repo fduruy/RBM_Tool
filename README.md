@@ -60,11 +60,23 @@ RBM_TOOL/
     └── Rep_Sensi.csv
     └── Offsetting.csv
 
-## Stockage des résultats en base SQLite
+## Stockage en base SQLite
 
-À chaque exécution, les 5 tables de résultats sont enregistrées dans `data/output/rbm_results.db` (SQLite, tables remplacées à chaque run) :
+La base `data/output/rbm_results.db` contient à la fois les tables d'entrée et les tables de résultats (toutes remplacées à chaque run) :
 
-- `internal_sub_portfolios`, `matched_trades`, `external_usage`, `unmatched_sensitivities`, `sub_portfolio_summary`
+- Entrée : `gt_valo`, `rep_sensi`, `offsetting`
+- Résultats : `internal_sub_portfolios`, `matched_trades`, `external_usage`, `unmatched_sensitivities`, `sub_portfolio_summary`
+
+Les inputs proviennent désormais de la base de données :
+
+```bash
+# Première fois (ou quand les fichiers d'entrée changent) : charger les CSV dans la base
+python src/main.py --init-db            # depuis data/input/
+python src/main.py --samples --init-db  # depuis data/samples/
+
+# Ensuite, run normal : les inputs sont lus depuis la base
+python src/main.py
+```
 
 ### Lier la base à Excel en dynamique
 
