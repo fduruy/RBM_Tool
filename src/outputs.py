@@ -14,7 +14,6 @@ This module handles:
 import pandas as pd
 import os
 import logging
-from datetime import datetime
 from typing import Dict, Optional
 
 # Configure logging for debug messages
@@ -43,9 +42,9 @@ def ensure_output_directory(output_dir: str = 'data/output/') -> bool:
 
 def generate_output_filename(prefix: str = 'resultats', output_dir: str = 'data/output/') -> str:
     """
-    Generate a timestamped output filename.
+    Generate an output filename.
     
-    Format: prefix[YYYYMMDD].csv (e.g., resultats20261011.csv)
+    Format: prefix.csv (e.g., resultats.csv)
     
     Args:
         prefix (str): Prefix for the filename (default: 'resultats')
@@ -55,9 +54,7 @@ def generate_output_filename(prefix: str = 'resultats', output_dir: str = 'data/
         str: Full path to the output file
     """
     try:
-        # Get current date in YYYYMMDD format
-        date_str = datetime.now().strftime('%Y%m%d')
-        filename = f"{prefix}{date_str}.csv"
+        filename = f"{prefix}.csv"
         full_path = os.path.join(output_dir, filename)
         
         logger.info(f"Generated output filename: {full_path}")
