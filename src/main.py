@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from inputs import read_and_validate_input
 from calculations import process_all_trades
 from outputs import write_all_outputs
+from database import save_results
 
 # Configure logging
 logging.basicConfig(
@@ -81,6 +82,14 @@ def main(input_dir: str = 'data/input/', output_dir: str = 'data/output/',
         # Step 3: Write output
         logger.info(f"\nStep 3: Writing output files to {output_dir}")
         success = write_all_outputs(results, output_dir)
+
+        # Step 4: Save results to SQLite database (tables replaced each run)
+        logger.info("\nStep 4: Saving result tables to SQLite database")
+        db_path = os.path.join(output_dir, 'rbm_results.db')
+        db_success = save_results(results, db_path)
+        if not db_success:
+            logger.error("Failed to save results to SQLite database")
+        success = success and db_success
         
         if success:
             logger.info("\n" + "="*60)

@@ -59,3 +59,15 @@ RBM_TOOL/
     └── GT_Valo.csv
     └── Rep_Sensi.csv
     └── Offsetting.csv
+
+## Stockage des résultats en base SQLite
+
+À chaque exécution, les 5 tables de résultats sont enregistrées dans `data/output/rbm_results.db` (SQLite, tables remplacées à chaque run) :
+
+- `internal_sub_portfolios`, `matched_trades`, `external_usage`, `unmatched_sensitivities`, `sub_portfolio_summary`
+
+### Lier la base à Excel en dynamique
+
+1. Installer une seule fois un pilote ODBC SQLite (ex. [sqliteodbc de ch-werner](https://www.ch-werner.de/sqliteodbc/)).
+2. Dans Excel : **Données → Obtenir des données → À partir d'autres sources → À partir de ODBC**, sélectionner le pilote SQLite et pointer sur `data/output/rbm_results.db`.
+3. Choisir les tables voulues, puis **Actualiser tout** après chaque run de l'outil (ou activer l'actualisation à l'ouverture du classeur).
