@@ -144,6 +144,8 @@ def load_inputs(db_path: str = DEFAULT_DB_PATH) -> Optional[Dict[str, pd.DataFra
             missing = [k for k in INPUT_TABLE_KEYS if k not in available]
             if missing:
                 logger.error(f"Input tables missing in database: {missing}")
+                logger.error("Run 'python src/main.py --init-db' (or '--samples --init-db') "
+                             "once to load the input files into the database")
                 return None
             data = {k: pd.read_sql(f"SELECT * FROM {k}", conn) for k in INPUT_TABLE_KEYS}
         finally:
