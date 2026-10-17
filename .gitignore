@@ -9,6 +9,8 @@ __pycache__/
 #data
 data/input/
 data/output/
+data/database/
+*.db
 
 # Distribution / packaging
 .Python
