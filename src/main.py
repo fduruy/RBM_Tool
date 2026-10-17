@@ -53,7 +53,7 @@ def init_db_from_files(input_dir: str, db_path: str) -> bool:
 
 def main(input_dir: str = 'data/input/', output_dir: str = 'data/output/',
          use_samples: bool = False, init_db: bool = False,
-         db_path: str = os.path.join('database', 'rbm_results.db')) -> bool:
+         db_path: str = os.path.join('data', 'database', 'rbm_results.db')) -> bool:
     """
     Main function to execute the entire RBM_Tool workflow.
 
@@ -170,8 +170,8 @@ def parse_arguments():
     parser.add_argument(
         '--db-path',
         type=str,
-        default=os.path.join('database', 'rbm_results.db'),
-        help='Path to the SQLite database file (default: database/rbm_results.db)'
+        default=os.path.join('data', 'database', 'rbm_results.db'),
+        help='Path to the SQLite database file (default: data/database/rbm_results.db)'
     )
     
     parser.add_argument(

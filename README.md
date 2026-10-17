@@ -62,7 +62,7 @@ RBM_TOOL/
 
 ## Stockage en base SQLite
 
-La base `database/rbm_results.db` contient à la fois les tables d'entrée et les tables de résultats (toutes remplacées à chaque run) :
+La base `data/database/rbm_results.db` contient à la fois les tables d'entrée et les tables de résultats (toutes remplacées à chaque run) :
 
 - Entrée : `gt_valo`, `rep_sensi`, `offsetting`
 - Résultats : `internal_sub_portfolios`, `matched_trades`, `external_usage`, `unmatched_sensitivities`, `sub_portfolio_summary`
@@ -81,5 +81,5 @@ python src/main.py
 ### Lier la base à Excel en dynamique
 
 1. Installer une seule fois un pilote ODBC SQLite (ex. [sqliteodbc de ch-werner](https://www.ch-werner.de/sqliteodbc/)).
-2. Dans Excel : **Données → Obtenir des données → À partir d'autres sources → À partir de ODBC**, sélectionner le pilote SQLite et pointer sur `database/rbm_results.db`.
+2. Dans Excel : **Données → Obtenir des données → À partir d'autres sources → À partir de ODBC**, sélectionner le pilote SQLite et pointer sur `data/database/rbm_results.db`.
 3. Choisir les tables voulues, puis **Actualiser tout** après chaque run de l'outil (ou activer l'actualisation à l'ouverture du classeur).
