@@ -52,7 +52,8 @@ def init_db_from_files(input_dir: str, db_path: str) -> bool:
 
 
 def main(input_dir: str = 'data/input/', output_dir: str = 'data/output/',
-         use_samples: bool = False, init_db: bool = False) -> bool:
+         use_samples: bool = False, init_db: bool = False,
+         db_path: str = os.path.join('database', 'rbm_results.db')) -> bool:
     """
     Main function to execute the entire RBM_Tool workflow.
 
@@ -64,6 +65,7 @@ def main(input_dir: str = 'data/input/', output_dir: str = 'data/output/',
         output_dir (str): Directory to write output files
         use_samples (bool): If True, use sample data from data/samples/
         init_db (bool): If True, (re)load the input files into the database first
+        db_path (str): Path to the SQLite database file
 
     Returns:
         bool: True if the entire workflow completed successfully
@@ -73,8 +75,6 @@ def main(input_dir: str = 'data/input/', output_dir: str = 'data/output/',
     logger.info("="*60)
     
     try:
-        db_path = os.path.join(output_dir, 'rbm_results.db')
-
         # Step 0 (optional): populate the database from input files
         if init_db:
             if use_samples:
@@ -166,6 +166,13 @@ def parse_arguments():
         default='data/output/',
         help='Directory to write output files (default: data/output/)'
     )
+
+    parser.add_argument(
+        '--db-path',
+        type=str,
+        default=os.path.join('database', 'rbm_results.db'),
+        help='Path to the SQLite database file (default: database/rbm_results.db)'
+    )
     
     parser.add_argument(
         '--samples',
@@ -192,6 +199,7 @@ def parse_arguments():
         'output_dir': args.output_dir,
         'use_samples': args.samples,
         'init_db': args.init_db,
+        'db_path': args.db_path,
         'verbose': args.verbose
     }
 
@@ -213,7 +221,8 @@ if __name__ == "__main__":
         input_dir=args['input_dir'],
         output_dir=args['output_dir'],
         use_samples=args.get('use_samples', False),
-        init_db=args.get('init_db', False)
+        init_db=args.get('init_db', False),
+        db_path=args['db_path']
     )
     
     # Exit with appropriate code

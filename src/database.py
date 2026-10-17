@@ -15,7 +15,7 @@ Excel dynamic link
 ------------------
 1. Install a SQLite ODBC driver once (e.g. ch-werner.de/sqliteodbc).
 2. Excel: Data > Get Data > From Other Sources > From ODBC,
-   point it to data/output/rbm_results.db, select the tables.
+   point it to database/rbm_results.db, select the tables.
 3. Refresh All in Excel after each run of the tool.
 """
 
@@ -30,7 +30,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = os.path.join('data', 'output', 'rbm_results.db')
+DEFAULT_DB_PATH = os.path.join('database', 'rbm_results.db')
 
 # Result table keys that are persisted (mirrors get_results() keys)
 TABLE_KEYS = [
