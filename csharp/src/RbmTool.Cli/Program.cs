@@ -26,13 +26,13 @@ public static class Program
             switch (args[i])
             {
                 case "--input-dir":
-                    inputDir = ArgsValue(args, ++i, args[i]);
+                    inputDir = ArgsValue(args, ++i, "--input-dir");
                     break;
                 case "--output-dir":
-                    outputDir = ArgsValue(args, ++i, args[i]);
+                    outputDir = ArgsValue(args, ++i, "--output-dir");
                     break;
                 case "--db-path":
-                    dbPath = ArgsValue(args, ++i, args[i]);
+                    dbPath = ArgsValue(args, ++i, "--db-path");
                     break;
                 case "--samples":
                     useSamples = true;

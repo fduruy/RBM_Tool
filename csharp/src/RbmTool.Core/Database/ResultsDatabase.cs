@@ -40,29 +40,44 @@ public sealed class ResultsDatabase
         return conn;
     }
 
-    private static void ReplaceTable(SqliteConnection conn, string table, string columns, IEnumerable<object?[]> rows)
+    private static void ReplaceTable(SqliteConnection conn, SqliteTransaction? tx,
+                                      string table, string columns, IEnumerable<object?[]> rows)
     {
+        var columnNames = columns.Split(',').Select(c => c.Trim()).ToArray();
+
         using (var drop = conn.CreateCommand())
         {
+            drop.Transaction = tx;
             drop.CommandText = $"DROP TABLE IF EXISTS {table};";
             drop.ExecuteNonQuery();
         }
 
-        var placeholders = string.Join(", ", Enumerable.Range(0, columns.Split(',').Length).Select(_ => "?"));
         using (var create = conn.CreateCommand())
         {
+            create.Transaction = tx;
             create.CommandText = $"CREATE TABLE {table} ({columns});";
             create.ExecuteNonQuery();
         }
 
         using var insert = conn.CreateCommand();
-        insert.CommandText = $"INSERT INTO {table} ({columns}) VALUES ({placeholders});";
+        insert.Transaction = tx;
+        var parameterSql = string.Join(", ", columnNames.Select((c, i) => $"@p{i}"));
+        var columnSql = string.Join(", ", columnNames);
+        insert.CommandText = $"INSERT INTO {table} ({columnSql}) VALUES ({parameterSql});";
+
+        var parameters = new SqliteParameter[columnNames.Length];
+        for (var i = 0; i < columnNames.Length; i++)
+        {
+            parameters[i] = insert.CreateParameter();
+            parameters[i].ParameterName = $"@p{i}";
+            insert.Parameters.Add(parameters[i]);
+        }
+
         foreach (var row in rows)
         {
-            insert.Parameters.Clear();
-            foreach (var value in row)
+            for (var i = 0; i < parameters.Length; i++)
             {
-                insert.Parameters.AddWithValue(parameterName: $"@p{insert.Parameters.Count}", value ?? DBNull.Value);
+                parameters[i].Value = row[i] ?? DBNull.Value;
             }
             insert.ExecuteNonQuery();
         }
@@ -74,21 +89,21 @@ public sealed class ResultsDatabase
         using var conn = Open();
         using var tx = conn.BeginTransaction();
 
-        ReplaceTable(conn, "gt_valo", "TranNum, InsNum, ExternalParty, PricingModel, MTM, CCY, Way",
+        ReplaceTable(conn, tx, "gt_valo", "TranNum, InsNum, ExternalParty, PricingModel, MTM, CCY, Way",
             data.Trades.Select(t => new object?[]
             {
                 t.TranNum, t.InsNum, t.ExternalParty, t.PricingModel,
                 t.MtM.ToString("R", CultureInfo.InvariantCulture), t.Ccy, t.Way
             }));
 
-        ReplaceTable(conn, "rep_sensi", "TranNum, InsNum, Index, Tenor, Gpt_Id, Delta",
+        ReplaceTable(conn, tx, "rep_sensi", "TranNum, InsNum, Index, Tenor, Gpt_Id, Delta",
             data.Sensitivities.Select(s => new object?[]
             {
                 s.TranNum, s.InsNum, s.Index, s.Tenor, s.GptId,
                 s.Delta.ToString("R", CultureInfo.InvariantCulture)
             }));
 
-        ReplaceTable(conn, "offsetting", "TranNum, InsNum, Daily_PL, YTD_PNL, CCY",
+        ReplaceTable(conn, tx, "offsetting", "TranNum, InsNum, Daily_PL, YTD_PNL, CCY",
             data.Offsetting.Select(o => new object?[]
             {
                 o.TranNum, o.InsNum,
@@ -182,14 +197,14 @@ public sealed class ResultsDatabase
         using var conn = Open();
         using var tx = conn.BeginTransaction();
 
-        ReplaceTable(conn, "internal_sub_portfolios", "SubPortfolio, Index, Tenor, Delta",
+        ReplaceTable(conn, tx, "internal_sub_portfolios", "SubPortfolio, Index, Tenor, Delta",
             results.InternalSubPortfolios.Select(r => new object?[]
             {
                 r.SubPortfolio, r.Index, r.Tenor,
                 r.Delta.ToString("R", CultureInfo.InvariantCulture)
             }));
 
-        ReplaceTable(conn, "matched_trades", "SubPortfolio, External_TranNum, Usage, Reduction, Iteration",
+        ReplaceTable(conn, tx, "matched_trades", "SubPortfolio, External_TranNum, Usage, Reduction, Iteration",
             results.MatchedTrades.Select(m => new object?[]
             {
                 m.SubPortfolio, m.ExternalTranNum,
@@ -198,21 +213,21 @@ public sealed class ResultsDatabase
                 m.Iteration
             }));
 
-        ReplaceTable(conn, "external_usage", "TranNum, InsNum, ExternalParty, CCY, PricingModel, Way, Usage",
+        ReplaceTable(conn, tx, "external_usage", "TranNum, InsNum, ExternalParty, CCY, PricingModel, Way, Usage",
             results.ExternalUsage.Select(e => new object?[]
             {
                 e.TranNum, e.InsNum, e.ExternalParty, e.Ccy, e.PricingModel, e.Way,
                 e.Usage.ToString("R", CultureInfo.InvariantCulture)
             }));
 
-        ReplaceTable(conn, "unmatched_sensitivities", "SubPortfolio, Index, Tenor, Delta",
+        ReplaceTable(conn, tx, "unmatched_sensitivities", "SubPortfolio, Index, Tenor, Delta",
             results.UnmatchedSensitivities.Select(r => new object?[]
             {
                 r.SubPortfolio, r.Index, r.Tenor,
                 r.Delta.ToString("R", CultureInfo.InvariantCulture)
             }));
 
-        ReplaceTable(conn, "sub_portfolio_summary", "SubPortfolio, Initial_L1, Final_L1, Nb_Matches, Iteration_Cap_Reached",
+        ReplaceTable(conn, tx, "sub_portfolio_summary", "SubPortfolio, Initial_L1, Final_L1, Nb_Matches, Iteration_Cap_Reached",
             results.SubPortfolioSummary.Select(s => new object?[]
             {
                 s.SubPortfolio,

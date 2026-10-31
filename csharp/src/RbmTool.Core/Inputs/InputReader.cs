@@ -54,17 +54,6 @@ public static class InputReader
         TrimOptions = TrimOptions.Trim,
     };
 
-    private static List<T> ReadCsv<T>(string path, ClassMap<T>? map = null)
-    {
-        using var reader = new StreamReader(path);
-        using var csv = new CsvReader(reader, CsvConfig());
-        if (map is not null)
-        {
-            csv.Context.RegisterClassMap(map);
-        }
-        return csv.GetRecords<T>().ToList();
-    }
-
     private static List<T> ReadCsvWithHeaderCheck<T>(string path, string[] requiredColumns)
     {
         if (!File.Exists(path))
@@ -76,7 +65,7 @@ public static class InputReader
         using var csv = new CsvReader(reader, CsvConfig());
         csv.Read();
         csv.ReadHeader();
-        var headers = csv.HeaderRecords ?? [];
+        string[] headers = csv.HeaderRecord ?? [];
         var missing = requiredColumns.Where(c => !headers.Contains(c, StringComparer.Ordinal)).ToList();
         if (missing.Count > 0)
         {

@@ -58,9 +58,8 @@ public class PortfolioMatcherTests
     [Fact]
     public void UsageIsCappedAtOne_AcrossSubPortfolios()
     {
-        // Two internal sub-portfolios (different CCY -> no, same group needed)
-        // Use two ways of same group? Internals are grouped by Way too, so use
-        // a second internal trade in the same group via partial consumption.
+        // Two internal sub-portfolios in different CCY groups: the EUR external
+        // only matches the EUR sub-portfolio (MatchCcyPm = true by default).
         var internalTrades = new List<TradeInfo> { Trade(1, "CLFA", "EUR", "Pay"), Trade(3, "CLFB", "GBP", "Pay") };
         var externalTrades = new List<TradeInfo> { Trade(2, "BANKX", "EUR", "Rec") };
         var sensi = new List<PortfolioMatcher.SensitivityRow>
